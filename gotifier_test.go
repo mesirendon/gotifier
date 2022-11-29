@@ -190,7 +190,6 @@ func TestThreadsafe(t *testing.T) {
 		}
 	}
 
-	// drain queues
 	for i := 0; i < (n * 3); i++ {
 		select {
 		case <-m1.received:
@@ -200,9 +199,6 @@ func TestThreadsafe(t *testing.T) {
 	}
 
 	wg.Wait()
-
-	// counts should be correct and all agree. and this should
-	// run fine under `go test -race -cpu=5`
 
 	t.Log("m1", m1.String())
 	t.Log("m2", m2.String())
