@@ -5,23 +5,23 @@ import "sync"
 type Consumer interface{}
 
 type Notifier struct {
-	mut      sync.RWMutex
-	notifees map[Consumer]struct{}
+	mut       sync.RWMutex
+	consumers map[Consumer]struct{}
 }
 
 func (n *Notifier) Notify(c Consumer) {
 	n.mut.Lock()
-	if n.notifees == nil {
-		n.notifees = make(map[Consumer]struct{})
+	if n.consumers == nil {
+		n.consumers = make(map[Consumer]struct{})
 	}
-	n.notifees[c] = struct{}{}
+	n.consumers[c] = struct{}{}
 	n.mut.Unlock()
 }
 
 func (n *Notifier) StopNotify(c Consumer) {
 	n.mut.Lock()
-	if n.notifees != nil {
-		delete(n.notifees, c)
+	if n.consumers != nil {
+		delete(n.consumers, c)
 	}
 	n.mut.Unlock()
 }
@@ -30,11 +30,11 @@ func (n *Notifier) NotifyAll(notify func(Consumer)) {
 	n.mut.Lock()
 	defer n.mut.Unlock()
 
-	if n.notifees == nil {
+	if n.consumers == nil {
 		return
 	}
 
-	for notifee := range n.notifees {
-		go notify(notifee)
+	for consumer := range n.consumers {
+		go notify(consumer)
 	}
 }

@@ -6,7 +6,9 @@ import (
 	"testing"
 )
 
-type Packet struct{}
+type Packet struct {
+	txt int
+}
 
 type Router struct {
 	queue    chan Packet
@@ -57,16 +59,16 @@ type Metrics struct {
 	enqueued  int
 	forwarded int
 	dropped   int
-	received  chan struct{}
+	received  chan Packet
 	sync.Mutex
 }
 
-func (m *Metrics) Enqueued(*Router, Packet) {
+func (m *Metrics) Enqueued(r *Router, p Packet) {
 	m.Lock()
 	m.enqueued++
 	m.Unlock()
 	if m.received != nil {
-		m.received <- struct{}{}
+		m.received <- p
 	}
 }
 
@@ -75,7 +77,7 @@ func (m *Metrics) Forwarded(*Router, Packet) {
 	m.forwarded++
 	m.Unlock()
 	if m.received != nil {
-		m.received <- struct{}{}
+		m.received <- Packet{}
 	}
 }
 
@@ -84,7 +86,7 @@ func (m *Metrics) Dropped(*Router, Packet) {
 	m.dropped++
 	m.Unlock()
 	if m.received != nil {
-		m.received <- struct{}{}
+		m.received <- Packet{}
 	}
 }
 
@@ -98,16 +100,18 @@ func (m *Metrics) String() string {
 }
 
 func TestNotifies(t *testing.T) {
-	m := Metrics{received: make(chan struct{})}
+	m := Metrics{received: make(chan Packet)}
 	r := Router{queue: make(chan Packet, 10)}
 	r.Notify(&m)
 
 	for i := 0; i < 10; i++ {
-		r.Receive(Packet{})
+		r.Receive(Packet{
+			txt: i,
+		})
 		<-m.received
 
 		if m.enqueued != (i + 1) {
-			t.Error("Not notifyiing correctly", m.enqueued, i+1)
+			t.Error("Not notifying correctly", m.enqueued, i+1)
 		}
 	}
 
@@ -123,10 +127,12 @@ func TestNotifies(t *testing.T) {
 			t.Error("Not notifying correctly", m.dropped, i+1)
 		}
 	}
+
+	t.Log("m", m.String())
 }
 
 func TestStopsNotifying(t *testing.T) {
-	m := Metrics{received: make(chan struct{})}
+	m := Metrics{received: make(chan Packet)}
 	r := Router{queue: make(chan Packet, 10)}
 	r.Notify(&m)
 
@@ -159,9 +165,9 @@ func TestStopsNotifying(t *testing.T) {
 func TestThreadsafe(t *testing.T) {
 	N := 1000
 	r := Router{queue: make(chan Packet, 10)}
-	m1 := Metrics{received: make(chan struct{})}
-	m2 := Metrics{received: make(chan struct{})}
-	m3 := Metrics{received: make(chan struct{})}
+	m1 := Metrics{received: make(chan Packet)}
+	m2 := Metrics{received: make(chan Packet)}
+	m3 := Metrics{received: make(chan Packet)}
 
 	r.Notify(&m1)
 	r.Notify(&m2)
@@ -197,6 +203,10 @@ func TestThreadsafe(t *testing.T) {
 		case <-m3.received:
 		}
 	}
+
+	t.Log("m1", m1.String())
+	t.Log("m2", m2.String())
+	t.Log("m3", m3.String())
 
 	wg.Wait()
 
